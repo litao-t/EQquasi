@@ -1,0 +1,90 @@
+#! /usr/bin/env python3
+# time series observation at off_fault stations
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import re, glob, imageio
+
+# pars
+xmin, xmax = -30,30
+ymin, ymax = -10,10
+ntime = 20
+
+# 设定台站间距应一致
+dsta = 2
+x_sta,y_sta = np.arange(xmin,xmax+1e-3,dsta),np.arange(ymin,ymax+1e-3,dsta)
+filenames = glob.glob('.//srfst*txt')
+
+# 能否保存成dataset
+shear_velo = np.zeros((len(y_sta),len(x_sta),ntime))
+vertical_velo = np.zeros((len(y_sta),len(x_sta),ntime))
+norm_velo = np.zeros((len(y_sta),len(x_sta),ntime))
+# time_list = []
+
+ntag = 0
+
+for filename in filenames:
+    numbers = re.findall(r'\d{3}', filename)
+    # coor
+    strk,st,dp = re.findall(r'-?\d{3}|st-?\d{3}|dp-?\d{3}', filename)
+    strk = int(strk)
+    st = int(st.replace('st',''))
+    xi = int((strk-xmin)/dsta)
+    yi = int((st-ymin)/dsta)
+
+    datai = pd.read_csv(filename,sep='\s+',header = None)
+    datai = np.array(datai)
+
+    if ntag == 0:
+        time_sep = int(np.floor((len(datai)-1)/(ntime-1)))
+        if time_sep == 0:
+            time_sep = 1
+        ntime = int(np.floor((len(datai)-1)/time_sep))
+        print(str(ntime)+"  "+str(time_sep))
+        time_list = np.linspace(0,time_sep*ntime,ntime+1,dtype=int)
+        time_simu = np.array([datai[itime,0] for itime in time_list]) # units in second
+        # time_simu = time_simu / (3600*24) # units in day
+        ntag = ntag + 1
+
+    for i in range(ntime):
+        itime = time_list[i]
+        shear_velo[yi,xi,i] = datai[itime,2]
+        vertical_velo[yi,xi,i] = datai[itime,4]
+        norm_velo[yi,xi,i] = datai[itime,6]
+
+# plot
+XX, YY = np.meshgrid(x_sta,y_sta)
+fname_list = []
+
+for i in range(ntime):
+    
+    fig = plt.figure(figsize=(20,5))
+    ax1 = fig.add_subplot(131)
+    ax1.pcolormesh(XX, YY, shear_velo[:,:,i] ,cmap='rainbow')#,shading='gouraud'
+    ax1.set_xlabel(r'$x$',fontsize=14)
+    ax1.set_ylabel(r'$y$',fontsize=14)
+    ax1.set_title('shear velocity')
+    
+    ax2 = fig.add_subplot(132)
+    ax2.pcolormesh(XX, YY, vertical_velo[:,:,i] ,cmap='rainbow')
+    ax2.set_xlabel(r'$x$',fontsize=14)
+    ax2.set_title('vertical velocity')
+    
+    ax3 = fig.add_subplot(133)
+    pm3 = ax3.pcolormesh(XX, YY, norm_velo[:,:,i] ,cmap='rainbow')
+    ax3.set_xlabel(r'$x$',fontsize=14)
+    ax3.set_title('normal velocity')
+    fig.colorbar(pm3, ax =[ax1,ax2,ax3], shrink=0.95, aspect=20, extend='both', pad=0.03)
+
+    fig.suptitle(r'Time = '+str(np.around(time_simu, decimals=2)[i])+'s',fontsize=18)
+    fname = 'fig_'+str(i+1)+'.png'
+    fname_list.append(fname)
+    
+    plt.savefig(fname, dpi=300)
+    plt.close()
+
+with imageio.get_writer('./time_series.gif', mode='I') as writer:
+    for fig in fname_list:
+        image = imageio.v2.imread(fig)
+        writer.append_data(image)
+
