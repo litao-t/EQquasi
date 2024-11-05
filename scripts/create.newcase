@@ -25,8 +25,13 @@ def _main_func(description):
     input_path = eqquasi_root + '/case_input/' + str(compset) 
     utils_path = eqquasi_root + '/scripts'
   
+    f1_list = ['case.setup','plot_on_fault_vars2','plot_time_series','defaultParameters.py']
     case_copy(input_path, case_path)
-    case_copy(utils_path, case_path)
+    for f in f1_list:
+        f1 = utils_path + '/' + f
+        shutil.copy(f1, case_path)
+        
+    #case_copy(utils_path, case_path)
 
 if __name__ == "__main__":
     _main_func(__doc__)
